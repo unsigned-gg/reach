@@ -257,6 +257,47 @@ impl Supervisor {
                 depends_on: vec!["x11vnc"],
                 ready_check: ReadyCheck::TcpPort(6080),
             },
+            ProcessSpec {
+                name: "chrome",
+                command: "google-chrome",
+                args: vec![
+                    "--remote-debugging-port=9222".into(),
+                    "--remote-debugging-address=127.0.0.1".into(),
+                    "--no-sandbox".into(),
+                    "--disable-dev-shm-usage".into(),
+                    // Enable software-rendered WebGL via SwiftShader. Without
+                    // a working WebGL context the sandbox itself looks like a
+                    // bot regardless of what stealth shims claim about
+                    // VENDOR/RENDERER strings. `--enable-unsafe-swiftshader`
+                    // is required from Chrome 120+ to opt into the fallback.
+                    "--use-gl=angle".into(),
+                    "--use-angle=swiftshader".into(),
+                    "--enable-unsafe-swiftshader".into(),
+                    "--user-data-dir=/tmp/chrome-profile".into(),
+                    "--window-position=0,0".into(),
+                    format!("--window-size={},{}", self.width, self.height),
+                    "about:blank".into(),
+                ],
+                env: vec![("DISPLAY", display.clone())],
+                restart: RestartPolicy::Always {
+                    max_restarts: 10,
+                    backoff: Duration::from_millis(500),
+                },
+                depends_on: vec!["xvfb"],
+                ready_check: ReadyCheck::TcpPort(9222),
+            },
+            ProcessSpec {
+                name: "reach-browserd",
+                command: "reach-browserd",
+                args: vec![],
+                env: vec![],
+                restart: RestartPolicy::Always {
+                    max_restarts: 10,
+                    backoff: Duration::from_millis(500),
+                },
+                depends_on: vec!["chrome"],
+                ready_check: ReadyCheck::Immediate,
+            },
         ]
     }
 
@@ -411,8 +452,7 @@ impl Supervisor {
                                         exit_code: code,
                                         restart_count: count,
                                         last_error: format!(
-                                            "max restarts exceeded (exit code: {:?})",
-                                            code
+                                            "max restarts exceeded (exit code: {code:?})"
                                         ),
                                     };
                                     continue;

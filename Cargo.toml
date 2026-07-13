@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/reach-cli", "crates/reach-supervisor"]
+members = [
+    "crates/reach-browserd",
+    "crates/reach-cdp",
+    "crates/reach-cli",
+    "crates/reach-scraper",
+    "crates/reach-supervisor",
+]
 
 [workspace.package]
 version = "0.0.1"
@@ -17,3 +23,5 @@ axum = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 anyhow = "1"
+reqwest = { version = "0.12", features = ["json"] }
+rusqlite = { version = "0.32", features = ["bundled"] }

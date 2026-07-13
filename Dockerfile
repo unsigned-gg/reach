@@ -5,7 +5,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock* ./
 COPY crates/ crates/
 
-RUN cargo build --release -p reach-supervisor
+RUN cargo build --release -p reach-supervisor -p reach-browserd
 
 # Stage 2: Runtime
 FROM ubuntu:24.04
@@ -45,13 +45,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer 2: Google Chrome
-RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-    | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-    > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
-    google-chrome-stable \
+# Layer 2: Chrome dependencies (Playwright will provide the binary)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+       libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 \
+       libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+       libpango-1.0-0 libcairo2 libasound2t64 libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 3: Node.js + computer-use-mcp
@@ -61,6 +59,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 4: Playwright + Scrapling + websockify
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN pip install --break-system-packages \
     playwright \
     "scrapling[fetchers]" \
@@ -68,6 +67,9 @@ RUN pip install --break-system-packages \
     && playwright install chromium \
     && scrapling install \
     || true
+    
+RUN ln -sf $(find /opt/ms-playwright/chromium-*/chrome-linux -name chrome -type f | head -n 1) /usr/bin/google-chrome-stable \
+    && ln -sf $(find /opt/ms-playwright/chromium-*/chrome-linux -name chrome -type f | head -n 1) /usr/bin/google-chrome
 
 # Layer 5: noVNC
 RUN git_url="https://github.com/novnc/noVNC.git" && \
@@ -78,6 +80,7 @@ RUN git_url="https://github.com/novnc/noVNC.git" && \
 
 # Layer 6: reach-supervisor binary
 COPY --from=builder /build/target/release/reach-supervisor /usr/local/bin/reach-supervisor
+COPY --from=builder /build/target/release/reach-browserd /usr/local/bin/reach-browserd
 
 # Layer 7: User + permissions + X11 socket dir
 RUN useradd -m -s /bin/bash sandbox \

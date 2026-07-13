@@ -83,6 +83,7 @@ pub struct SandboxPorts {
     pub vnc: u16,
     pub novnc: u16,
     pub health: u16,
+    pub browserd: u16,
     /// Additional host:container port pairs to publish, beyond the three
     /// built-in ports above. Used for ad-hoc workflows that need to expose
     /// extra services from inside the sandbox — e.g. forwarding Chrome's
@@ -97,6 +98,7 @@ impl Default for SandboxPorts {
             vnc: 5900,
             novnc: 6080,
             health: 8400,
+            browserd: 8401,
             extra: Vec::new(),
         }
     }
@@ -158,6 +160,7 @@ pub struct SandboxPortMapping {
     pub vnc: Option<u16>,
     pub novnc: Option<u16>,
     pub health: Option<u16>,
+    pub browserd: Option<u16>,
     /// Extra (host_port, container_port) pairs published by the user via
     /// `--extra-port`. Empty when no extras were requested.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -247,9 +250,16 @@ impl DockerClient {
                     host_port: Some(config.ports.health.to_string()),
                 }]),
             );
+            map.insert(
+                "8401/tcp".into(),
+                Some(vec![PortBinding {
+                    host_ip: Some("0.0.0.0".into()),
+                    host_port: Some(config.ports.browserd.to_string()),
+                }]),
+            );
             for (host_port, container_port) in &config.ports.extra {
                 map.insert(
-                    format!("{}/tcp", container_port),
+                    format!("{container_port}/tcp"),
                     Some(vec![PortBinding {
                         host_ip: Some("0.0.0.0".into()),
                         host_port: Some(host_port.to_string()),
@@ -299,7 +309,7 @@ impl DockerClient {
                 m.insert("6080/tcp".into(), HashMap::new());
                 m.insert("8400/tcp".into(), HashMap::new());
                 for (_, container_port) in &config.ports.extra {
-                    m.insert(format!("{}/tcp", container_port), HashMap::new());
+                    m.insert(format!("{container_port}/tcp"), HashMap::new());
                 }
                 m
             }),
@@ -333,6 +343,7 @@ impl DockerClient {
                 vnc: Some(config.ports.vnc),
                 novnc: Some(config.ports.novnc),
                 health: Some(config.ports.health),
+                browserd: Some(config.ports.browserd),
                 extra: config.ports.extra.clone(),
             },
             created_at: chrono::Utc::now().to_rfc3339(),
@@ -406,7 +417,7 @@ impl DockerClient {
         sandboxes
             .into_iter()
             .find(|s| s.name == target || s.container_id.starts_with(target))
-            .ok_or_else(|| anyhow::anyhow!("sandbox '{}' not found", target))
+            .ok_or_else(|| anyhow::anyhow!("sandbox '{target}' not found"))
     }
 
     pub async fn exec(&self, target: &str, command: &[String]) -> Result<ExecOutput> {
@@ -584,7 +595,7 @@ impl DockerClient {
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
             if tokio::time::Instant::now() > deadline {
-                bail!("timeout waiting for sandbox '{}' to become healthy", target);
+                bail!("timeout waiting for sandbox '{target}' to become healthy");
             }
 
             let out = self
@@ -614,6 +625,7 @@ fn extract_ports(ports: &[bollard::models::Port]) -> SandboxPortMapping {
         vnc: None,
         novnc: None,
         health: None,
+        browserd: None,
         extra: Vec::new(),
     };
 
@@ -622,6 +634,7 @@ fn extract_ports(ports: &[bollard::models::Port]) -> SandboxPortMapping {
             5900 => mapping.vnc = p.public_port,
             6080 => mapping.novnc = p.public_port,
             8400 => mapping.health = p.public_port,
+            8401 => mapping.browserd = p.public_port,
             other => {
                 if let Some(host_port) = p.public_port {
                     mapping.extra.push((host_port, other));

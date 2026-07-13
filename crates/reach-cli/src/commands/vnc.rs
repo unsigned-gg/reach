@@ -17,7 +17,7 @@ pub async fn run(args: VncArgs) -> anyhow::Result<()> {
         .novnc
         .ok_or_else(|| anyhow::anyhow!("noVNC port not mapped"))?;
 
-    let url = format!("http://localhost:{}/vnc.html?autoconnect=true", port);
+    let url = format!("http://localhost:{port}/vnc.html?autoconnect=true");
     println!("{} {}", "Opening...".dimmed(), url.cyan());
     open::that(&url)?;
     Ok(())

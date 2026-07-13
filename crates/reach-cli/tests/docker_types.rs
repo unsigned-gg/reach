@@ -124,6 +124,7 @@ fn sandbox_serializes_to_json() {
             vnc: Some(5900),
             novnc: Some(6080),
             health: Some(8400),
+            browserd: Some(8401),
             extra: Vec::new(),
         },
         created_at: "2026-04-02T00:00:00Z".into(),

@@ -1,0 +1,20 @@
+[package]
+name = "reach-scraper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Rust-native agentic scraper primitives for Reach"
+
+[dependencies]
+anyhow.workspace = true
+reach-cdp = { path = "../reach-cdp" }
+reqwest = { workspace = true, features = ["cookies"] }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+scraper = "0.20"
+percent-encoding = "2"

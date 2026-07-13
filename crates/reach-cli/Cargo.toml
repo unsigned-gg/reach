@@ -36,3 +36,6 @@ toml = "0.8"
 futures = "0.3"
 tokio-stream = "0.1"
 colored = "3"
+reqwest = { version = "0.13.3", features = ["json"] }
+reach-cdp = { path = "../reach-cdp" }
+reach-scraper = { path = "../reach-scraper" }

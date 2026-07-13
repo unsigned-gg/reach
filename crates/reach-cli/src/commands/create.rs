@@ -30,6 +30,10 @@ pub struct CreateArgs {
     #[arg(long)]
     pub health_port: Option<u16>,
 
+    /// browserd port
+    #[arg(long)]
+    pub browserd_port: Option<u16>,
+
     /// Publish an additional port from the sandbox to the host.
     ///
     /// Format: `HOST:CONTAINER` or `PORT` (same on both sides). Repeat the
@@ -92,6 +96,7 @@ pub async fn run(args: CreateArgs) -> anyhow::Result<()> {
             vnc: args.vnc_port.unwrap_or(cfg.sandbox.vnc_port),
             novnc: args.novnc_port.unwrap_or(cfg.sandbox.novnc_port),
             health: args.health_port.unwrap_or(cfg.sandbox.health_port),
+            browserd: args.browserd_port.unwrap_or(cfg.sandbox.browserd_port),
             extra: args.extra_ports.clone(),
         },
         profile,
@@ -147,14 +152,21 @@ pub async fn run(args: CreateArgs) -> anyhow::Result<()> {
         println!(
             "    {}     {}",
             "VNC:".bold(),
-            format!("http://localhost:{}", p).cyan()
+            format!("http://localhost:{p}").cyan()
         );
     }
     if let Some(p) = sandbox.ports.health {
         println!(
             "    {}  {}",
             "Health:".bold(),
-            format!("http://localhost:{}/health", p).cyan()
+            format!("http://localhost:{p}/health").cyan()
+        );
+    }
+    if let Some(p) = sandbox.ports.browserd {
+        println!(
+            "    {}     {}",
+            "CDP:".bold(),
+            format!("http://localhost:{p}/cdp").cyan()
         );
     }
     for (host_port, container_port) in &sandbox.ports.extra {
