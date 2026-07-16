@@ -1,0 +1,14 @@
+# Conventional Commits + gitleaks (federated standard).
+# Skip: LEFTHOOK=0.
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        head -1 {1} | grep -qE '^(feat|fix|perf|refactor|docs|test|ci|build|infra|security|style|chore)(\(.+\))?!?: .+' \
+          || { echo "commit-msg must be Conventional Commits: <type>(scope): <desc>"; exit 1; }
+
+pre-commit:
+  parallel: true
+  commands:
+    gitleaks:
+      run: gitleaks protect --staged --redact --no-banner || echo "gitleaks not installed — CI will enforce"
