@@ -16,7 +16,9 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Audit
-        run: cargo audit
+        # RUSTSEC-2024-0437 (protobuf 2.28 via prometheus): same justification as deny.toml,
+        # reach-supervisor only exports metrics and never parses protobuf input.
+        run: cargo audit --ignore RUSTSEC-2024-0437
 
   deny:
     name: Cargo Deny Advisories

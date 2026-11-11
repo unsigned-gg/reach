@@ -62,7 +62,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Layer 3: Node.js + computer-use-mcp
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g computer-use-mcp \
+    && npm install -g npm@latest computer-use-mcp \
+    && npm --prefix /usr/lib/node_modules/computer-use-mcp install --no-save sharp@latest \
+    && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 4: Playwright + Scrapling + websockify
