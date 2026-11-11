@@ -210,6 +210,10 @@ impl Labels {
 // Docker client
 // ═══════════════════════════════════════════════════════════
 
+/// Host address published sandbox ports bind to. Loopback only: noVNC and the
+/// supervisor API give full control of the sandbox and have no auth.
+pub const HOST_BIND_ADDR: &str = "127.0.0.1";
+
 pub struct DockerClient {
     client: bollard::Docker,
 }
@@ -232,28 +236,28 @@ impl DockerClient {
             map.insert(
                 "5900/tcp".into(),
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".into()),
+                    host_ip: Some(HOST_BIND_ADDR.into()),
                     host_port: Some(config.ports.vnc.to_string()),
                 }]),
             );
             map.insert(
                 "6080/tcp".into(),
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".into()),
+                    host_ip: Some(HOST_BIND_ADDR.into()),
                     host_port: Some(config.ports.novnc.to_string()),
                 }]),
             );
             map.insert(
                 "8400/tcp".into(),
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".into()),
+                    host_ip: Some(HOST_BIND_ADDR.into()),
                     host_port: Some(config.ports.health.to_string()),
                 }]),
             );
             map.insert(
                 "8401/tcp".into(),
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".into()),
+                    host_ip: Some(HOST_BIND_ADDR.into()),
                     host_port: Some(config.ports.browserd.to_string()),
                 }]),
             );
@@ -261,7 +265,7 @@ impl DockerClient {
                 map.insert(
                     format!("{container_port}/tcp"),
                     Some(vec![PortBinding {
-                        host_ip: Some("0.0.0.0".into()),
+                        host_ip: Some(HOST_BIND_ADDR.into()),
                         host_port: Some(host_port.to_string()),
                     }]),
                 );
