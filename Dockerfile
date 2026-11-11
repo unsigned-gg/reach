@@ -14,6 +14,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:99
 ENV HOME=/home/sandbox
 
+# apt mirror: the default resolvers on GitHub runners and on a WSL2 dev host
+# return SERVFAIL for *.ubuntu.com (verified 2026-11-11), which breaks every
+# apt-get below. mirrors.edge.kernel.org serves the same signed archive, and
+# apt still verifies it against the Ubuntu keyring.
+RUN sed -i 's#http://archive.ubuntu.com/ubuntu#http://mirrors.edge.kernel.org/ubuntu#g; s#http://security.ubuntu.com/ubuntu#http://mirrors.edge.kernel.org/ubuntu#g' \
+    /etc/apt/sources.list.d/ubuntu.sources
+
 # Layer 1: System deps — display, VNC, window manager, X11 tools, network
 # debug tooling. The network tools (iproute2, net-tools, dnsutils, jq) are
 # load-bearing for any agent that needs to introspect ports, sockets, or
