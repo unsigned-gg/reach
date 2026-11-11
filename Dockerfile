@@ -60,16 +60,23 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 # Layer 4: Playwright + Scrapling + websockify
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --break-system-packages \
     playwright \
     "scrapling[fetchers]" \
     websockify \
-    && playwright install chromium \
-    && scrapling install \
-    || true
-    
-RUN ln -sf $(find /opt/ms-playwright/chromium-*/chrome-linux -name chrome -type f | head -n 1) /usr/bin/google-chrome-stable \
-    && ln -sf $(find /opt/ms-playwright/chromium-*/chrome-linux -name chrome -type f | head -n 1) /usr/bin/google-chrome
+    && playwright install chromium
+RUN scrapling install || true
+
+# Playwright's layout changed (chrome-linux -> chrome-linux64), so locate the
+# binary by name and fail the build if it is missing, instead of leaving a
+# dangling symlink that only surfaces as a supervisor spawn error at runtime.
+RUN CHROME="$(find /opt/ms-playwright -path '*/chromium-*/chrome-linux*/chrome' -type f | head -n 1)" \
+    && test -x "$CHROME" \
+    && ln -sf "$CHROME" /usr/bin/google-chrome-stable \
+    && ln -sf "$CHROME" /usr/bin/google-chrome \
+    && test -x /usr/bin/google-chrome
 
 # Layer 5: noVNC
 RUN git_url="https://github.com/novnc/noVNC.git" && \
