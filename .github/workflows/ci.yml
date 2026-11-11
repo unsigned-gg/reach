@@ -206,8 +206,8 @@ jobs:
           docker exec reach-ci python3 -c "
           from scrapling import Fetcher
           r = Fetcher().get('https://example.com')
-          h1 = r.css('h1')[0].text
-          assert h1 == 'Example Domain', f'got: {h1}'
+          title = r.css('title')[0].text
+          assert title == 'Example Domain', f'got: {title}'
           print('Scrapling OK')
           "
 
