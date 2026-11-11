@@ -216,7 +216,7 @@ pub struct DockerClient {
 
 impl DockerClient {
     pub fn new() -> Result<Self> {
-        let client = bollard::Docker::connect_with_local_defaults()?;
+        let client = crate::endpoint::connect()?;
         Ok(Self { client })
     }
 
