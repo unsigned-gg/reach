@@ -210,13 +210,96 @@ impl Labels {
 // Docker client
 // ═══════════════════════════════════════════════════════════
 
+/// Resolve an override before falling back to Bollard's platform-local default.
+pub fn resolve_docker_socket(explicit: &str) -> Option<String> {
+    let config_dir = std::env::var_os("DOCKER_CONFIG")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".docker")));
+    resolve_docker_socket_with_env(
+        explicit,
+        std::env::var("DOCKER_HOST").ok().as_deref(),
+        std::env::var("DOCKER_CONTEXT").ok().as_deref(),
+        config_dir.as_deref(),
+        std::env::var_os("XDG_RUNTIME_DIR")
+            .as_deref()
+            .map(std::path::Path::new),
+    )
+}
+
+/// Precedence: explicit socket, host env, CLI context, rootless socket, default.
+/// Configuration read/parse failures deliberately leave the fallback available.
+pub fn resolve_docker_socket_with_env(
+    explicit: &str,
+    docker_host: Option<&str>,
+    docker_context: Option<&str>,
+    config_dir: Option<&std::path::Path>,
+    runtime_dir: Option<&std::path::Path>,
+) -> Option<String> {
+    if !explicit.is_empty() {
+        return Some(explicit.to_owned());
+    }
+    if let Some(host) = docker_host.filter(|host| !host.is_empty()) {
+        return Some(host.to_owned());
+    }
+    if let Some(dir) = config_dir {
+        let current = docker_context
+            .filter(|context| !context.is_empty())
+            .map(str::to_owned)
+            .or_else(|| {
+                let config: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(dir.join("config.json")).ok()?).ok()?;
+                config.get("currentContext")?.as_str().map(str::to_owned)
+            });
+        if let Some(context) = current.filter(|name| !name.is_empty() && name != "default") {
+            use sha2::{Digest, Sha256};
+            let path = dir
+                .join("contexts/meta")
+                .join(format!("{:x}", Sha256::digest(context.as_bytes())))
+                .join("meta.json");
+            let host = std::fs::read(path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .and_then(|meta| {
+                    meta.pointer("/Endpoints/docker/Host")?
+                        .as_str()
+                        .filter(|host| !host.is_empty())
+                        .map(str::to_owned)
+                });
+            if host.is_some() {
+                return host;
+            }
+        }
+    }
+    if !std::path::Path::new("/var/run/docker.sock").exists()
+        && let Some(socket) = runtime_dir.map(|dir| dir.join("docker.sock"))
+        && socket.exists()
+    {
+        return Some(socket.to_string_lossy().into_owned());
+    }
+    None
+}
+
 pub struct DockerClient {
     client: bollard::Docker,
 }
 
 impl DockerClient {
     pub fn new() -> Result<Self> {
-        let client = bollard::Docker::connect_with_local_defaults()?;
+        let config = crate::config::ReachConfig::load();
+        let client = match resolve_docker_socket(&config.docker.socket) {
+            Some(host)
+                if host.starts_with("tcp://")
+                    || host.starts_with("http://")
+                    || host.starts_with("https://") =>
+            {
+                bollard::Docker::connect_with_http(&host, 120, bollard::API_DEFAULT_VERSION)?
+            }
+            Some(socket) => {
+                bollard::Docker::connect_with_local(&socket, 120, bollard::API_DEFAULT_VERSION)?
+            }
+            None => bollard::Docker::connect_with_local_defaults()?,
+        };
         Ok(Self { client })
     }
 

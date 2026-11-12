@@ -34,6 +34,7 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 toml = "0.8"
 futures = "0.3"
+sha2 = "0.10"
 tokio-stream = "0.1"
 colored = "3"
 reqwest = { version = "0.13.3", features = ["json"] }
