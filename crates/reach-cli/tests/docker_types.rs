@@ -202,3 +202,145 @@ fn novnc_url_uses_localhost_pattern() {
         "http://localhost:6080/vnc.html?autoconnect=1&resize=remote"
     );
 }
+
+// Docker endpoint precedence. All configuration is isolated from the real home.
+struct DockerFixture(std::path::PathBuf);
+
+impl DockerFixture {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!("reach-context-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path).unwrap();
+        Self(path)
+    }
+
+    fn context(&self, name: &str, host: &str) {
+        use sha2::{Digest, Sha256};
+        let dir = self
+            .0
+            .join("contexts/meta")
+            .join(format!("{:x}", Sha256::digest(name)));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("meta.json"),
+            serde_json::json!({
+                "Endpoints": {"docker": {"Host": host}}
+            })
+            .to_string(),
+        )
+        .unwrap();
+    }
+
+    fn resolve(&self, explicit: &str, host: Option<&str>, context: Option<&str>) -> Option<String> {
+        resolve_docker_socket_with_env(explicit, host, context, Some(&self.0), None)
+    }
+}
+
+impl Drop for DockerFixture {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.0).unwrap();
+    }
+}
+
+#[test]
+fn resolve_docker_socket_current_context() {
+    let f = DockerFixture::new();
+    f.context("rootless", "unix:///run/user/1000/docker.sock");
+    std::fs::write(f.0.join("config.json"), r#"{"currentContext":"rootless"}"#).unwrap();
+    assert_eq!(
+        f.resolve("", Some(""), None).as_deref(),
+        Some("unix:///run/user/1000/docker.sock")
+    );
+}
+
+#[test]
+fn resolve_docker_socket_env_context_overrides_current() {
+    let f = DockerFixture::new();
+    f.context("chosen", "tcp://localhost:2375");
+    f.context("other", "unix:///other.sock");
+    std::fs::write(f.0.join("config.json"), r#"{"currentContext":"other"}"#).unwrap();
+    assert_eq!(
+        f.resolve("", None, Some("chosen")).as_deref(),
+        Some("tcp://localhost:2375")
+    );
+}
+
+#[test]
+fn resolve_docker_socket_default_context_is_skipped() {
+    let f = DockerFixture::new();
+    f.context("default", "unix:///wrong.sock");
+    std::fs::write(f.0.join("config.json"), r#"{"currentContext":"default"}"#).unwrap();
+    assert_eq!(f.resolve("", None, None), None);
+    assert_eq!(f.resolve("", None, Some("default")), None);
+}
+
+#[test]
+fn resolve_docker_socket_bad_files_fall_through() {
+    let f = DockerFixture::new();
+    assert_eq!(f.resolve("", None, None), None);
+    std::fs::write(f.0.join("config.json"), "{").unwrap();
+    assert_eq!(f.resolve("", None, None), None);
+    assert_eq!(f.resolve("", None, Some("missing")), None);
+    f.context("broken", "unix:///unused.sock");
+    use sha2::{Digest, Sha256};
+    let meta =
+        f.0.join("contexts/meta")
+            .join(format!("{:x}", Sha256::digest("broken")))
+            .join("meta.json");
+    std::fs::write(&meta, "{").unwrap();
+    assert_eq!(f.resolve("", None, Some("broken")), None);
+    std::fs::remove_file(&meta).unwrap();
+    std::fs::create_dir(&meta).unwrap();
+    assert_eq!(f.resolve("", None, Some("broken")), None);
+}
+
+#[test]
+fn resolve_docker_socket_host_wins_over_context() {
+    let f = DockerFixture::new();
+    f.context("rootless", "unix:///context.sock");
+    assert_eq!(
+        f.resolve("", Some("unix:///host.sock"), Some("rootless"))
+            .as_deref(),
+        Some("unix:///host.sock")
+    );
+}
+
+#[test]
+fn resolve_docker_socket_explicit_wins_over_everything() {
+    let f = DockerFixture::new();
+    f.context("rootless", "unix:///context.sock");
+    assert_eq!(
+        f.resolve(
+            "/explicit.sock",
+            Some("unix:///host.sock"),
+            Some("rootless")
+        )
+        .as_deref(),
+        Some("/explicit.sock")
+    );
+}
+
+#[test]
+fn resolve_docker_socket_runtime_fallback() {
+    let f = DockerFixture::new();
+    let socket = f.0.join("docker.sock");
+    assert_eq!(
+        resolve_docker_socket_with_env("", None, None, Some(&f.0), Some(&f.0)),
+        None
+    );
+    std::fs::write(&socket, "").unwrap();
+    let expected = if std::path::Path::new("/var/run/docker.sock").exists() {
+        None
+    } else {
+        Some(socket.to_string_lossy().into_owned())
+    };
+    assert_eq!(
+        resolve_docker_socket_with_env("", None, None, Some(&f.0), Some(&f.0)),
+        expected
+    );
+    f.context("selected", "unix:///selected.sock");
+    assert_eq!(
+        resolve_docker_socket_with_env("", None, Some("selected"), Some(&f.0), Some(&f.0))
+            .as_deref(),
+        Some("unix:///selected.sock")
+    );
+}
