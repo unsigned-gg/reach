@@ -1,14 +1,17 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "rust",
   "packages": {
-    "crates/reach-cli": {
-      "release-type": "rust",
-      "package-name": "reach-cli"
-    },
-    "crates/reach-supervisor": {
-      "release-type": "rust",
-      "package-name": "reach-supervisor"
+    ".": {
+      "release-type": "simple",
+      "package-name": "reach",
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "Cargo.toml",
+          "jsonpath": "$.workspace.package.version"
+        }
+      ]
     }
   }
 }
