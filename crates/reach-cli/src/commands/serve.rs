@@ -105,7 +105,7 @@ pub async fn run(args: ServeArgs) -> anyhow::Result<()> {
 
     let addr = format!("{host}:{port}");
     println!("reach MCP server listening on {addr}");
-    println!("Connect: claude mcp add reach --url http://{addr}/mcp");
+    println!("Connect: claude mcp add --transport http reach http://{addr}/mcp");
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
