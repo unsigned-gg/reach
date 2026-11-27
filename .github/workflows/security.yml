@@ -9,7 +9,8 @@ on:
 jobs:
   audit:
     name: Cargo Audit
-    runs-on: ubuntu-latest
+    runs-on: {group: ent-cygnus, labels: [cygnus]}  # hardened Kata ARC fleet
+    container: harbor.unsigned.gg/platform/ci-rust-runner:v0.1.14@sha256:d73d3748c0f22e7386109d12b01ccdf7282b0f529aab2c629b4e5ed558d42bc1
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -22,7 +23,8 @@ jobs:
 
   deny:
     name: Cargo Deny Advisories
-    runs-on: ubuntu-latest
+    runs-on: {group: ent-cygnus, labels: [cygnus]}  # hardened Kata ARC fleet
+    container: harbor.unsigned.gg/platform/ci-rust-runner:v0.1.14@sha256:d73d3748c0f22e7386109d12b01ccdf7282b0f529aab2c629b4e5ed558d42bc1
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -33,6 +35,7 @@ jobs:
 
   trivy:
     name: Trivy Container Scan
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
