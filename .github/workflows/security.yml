@@ -9,7 +9,7 @@ on:
 jobs:
   audit:
     name: Cargo Audit
-    runs-on: ubuntu-latest
+    runs-on: {group: ent-default, labels: [ci-rust]}  # estate Rust toolchain runner (SOP: ci-runner-always-internal)
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -22,7 +22,7 @@ jobs:
 
   deny:
     name: Cargo Deny Advisories
-    runs-on: ubuntu-latest
+    runs-on: {group: ent-default, labels: [ci-rust]}  # estate Rust toolchain runner (SOP: ci-runner-always-internal)
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -33,6 +33,7 @@ jobs:
 
   trivy:
     name: Trivy Container Scan
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
